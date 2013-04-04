@@ -66,10 +66,10 @@ class cstModel(object):
         for key in self.dataDict.keys():
             self.dataDict[key] = self.dataDict[key][:-1, :]
 
-    def rawPlot(self, var, rmax=30.0):
+    def rawPlot(self, var, title=None, rmax=30.0):
         rs, mus = numpy.meshgrid(self.rs, self.mus)
         ys = rs * mus
-        xs = rs * numpy.sqrt(1.0 - mus)
+        xs = rs * numpy.sqrt(1.0 - mus * mus)
 
         print xs
         print ys
@@ -77,4 +77,5 @@ class cstModel(object):
         plt.ylim([0, rmax])
         plt.pcolor(xs, ys, numpy.log10(self.dataDict[var].transpose()), vmin=10, vmax=15)
         plt.colorbar()
+        plt.title(title)
         plt.show()
