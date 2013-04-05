@@ -14,8 +14,11 @@ class cstModel(object):
 
     #rs are the values of the radial grid-points
     rs = None
+    NR = None
+    NSurf = None
     #mus are the cos(\thetas) of the polar angle grid-points
     mus = None
+    NU = None
 
     # CST output is in polytropic 'scaled' units with
     polyK = 617.714470405639
@@ -55,7 +58,7 @@ class cstModel(object):
                                for s in numpy.arange(0.0, 1.00, 1.0 / NS)])
 
         #scale rs to proper units: kilometers
-        self.rs *= self.polyK ** (self.polyN / 2.0) * consts.AGEO_LENGTH_IN_M / 1000.0
+        self.rs *= self.polyK ** (self.polyN / 2.0) * consts.AGEO_LENGTH_IN_CM
         #scale ed to proper units: g/cm^3
         self.dataDict['ed'] *= self.polyK ** (-self.polyN) * consts.AGEO_DENSITY_IN_CGS
 
@@ -65,8 +68,12 @@ class cstModel(object):
         # (rs point at infinity is omitted by omitting s = 1.0 above)
         for key in self.dataDict.keys():
             self.dataDict[key] = self.dataDict[key][:-1, :]
+            self.dataDict[key] = self.dataDict[key][:-(NSurf), :]
+        self.rs = self.rs[:-(NSurf)]
+        self.NR = len(self.rs)
+        self.NU = len(self.mus)
 
-    def rawPlot(self, var, title=None, rmax=30.0):
+    def rawPlot(self, var, title=None, rmax=25.0, func=lambda x:x*x):
         rs, mus = numpy.meshgrid(self.rs, self.mus)
         ys = rs * mus
         xs = rs * numpy.sqrt(1.0 - mus * mus)
@@ -75,7 +82,38 @@ class cstModel(object):
         print ys
         plt.xlim([0, rmax])
         plt.ylim([0, rmax])
-        plt.pcolor(xs, ys, numpy.log10(self.dataDict[var].transpose()), vmin=10, vmax=15)
+        #plt.pcolor(xs, ys, xs * func(self.dataDict[var].transpose()))  # , vmin=10, vmax=14.5)
+        plt.pcolor(xs, ys, func(self.dataDict[var].transpose()), vmin=10, vmax=14.5)
         plt.colorbar()
         plt.title(title)
         plt.show()
+
+    def integralOverStar(self, vars, func, edMin):
+        """
+        Does a volume integral over the star integrating over r, until
+        reaching edMin, then integrating over theta.
+        Integrates func(vars[0], vars[1], ...)
+        Therefore func must be a function of len(vars) variables
+        """
+
+        sum = 0.0
+        previousIntegralOverR = 0.0
+        for muInd in range(0, self.NU):
+            currentIntegralOverR = 0.0
+            for rInd in range(0, self.NR - 1):
+                if self.dataDict['ed'][rInd, muInd] < edMin:
+                    #print "RSURF: ", self.rs[rInd]
+                    break
+                r_i = self.rs[rInd]
+                r_iplus1 = self.rs[rInd + 1]
+                drCubed = r_iplus1 ** 3 - r_i ** 3
+                varsValues_i = [self.dataDict[var][rInd, muInd] for var in vars]
+                varsValues_iplus1 = [self.dataDict[var][rInd + 1, muInd] for var in vars]
+                averageValue = 0.5 *(func(*varsValues_iplus1) + func(*varsValues_i))
+                currentIntegralOverR += drCubed * averageValue
+            if muInd > 0:
+                dmu = self.mus[muInd] - self.mus[muInd - 1]
+                sum += dmu * 0.5 * (currentIntegralOverR + previousIntegralOverR)
+            previousIntegralOverR = currentIntegralOverR
+
+        return sum * 4.0 / 3.0 * numpy.pi

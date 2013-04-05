@@ -1,12 +1,17 @@
+import numpy
 from cstModel import cstModel
 
-modelName = 'c30p10'
+modelName = 'c0p0'
 
 filename = "model/hotModelReal0.9_data.dump"
-filename = "model/tov_" + modelName + "/outdata0.3000"
+filename = "model/a0.8_" + modelName + "/outdata0.3000"
 
 
 model = cstModel(filename)
 
+mass = model.integralOverStar(["ed"], lambda x: x, 10e10)
+volume = model.integralOverStar([], lambda: 1, 10e10)
 
-model.rawPlot('ed', modelName)
+print "Average density: ", mass / volume
+
+#model.rawPlot('ed', modelName + " a0.8", 30.0, numpy.log10)
